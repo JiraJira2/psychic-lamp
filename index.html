@@ -1,160 +1,68 @@
-<html>
-    <title>Test Application</title>
-    <div style="left: 50%; transform: translateX(-50%); position: fixed;">
-        <ul id="buttons"></ul>
-        <details style="width: fit-content; min-width: 100px;">
-            <summary>Cached Data</summary>
-            <div style="max-height: 80vh; overflow-y: auto;">
-                <table id="data">
-                    <tr>
-                        <th>Key</th>
-                        <th>Value</th>
-                    </tr>
-                </table>
-            </div>
-        </details>
-    </div>
-    <script>
-        // Example button actions showcasing what can be done
-        const actions = [
-            {
-                name: "Paleto Bay",
-                action: {type: "setWaypoint", x: -267, y: 6231},
-            },
-            {
-                name: "Sandy Shores",
-                action: {type: "setWaypoint", x: 1601, y: 3662},
-            },
-            {
-                name: "Los Santos",
-                action: {type: "setWaypoint", x: 228, y: -878},
-            },
-            {
-                name: "Faction Menu",
-                action: {type: "sendCommand", command: "faction"},
-            },
-            {
-                name: "Open Trunk",
-                action: {type: "sendCommand", command: "rm_trunk"},
-            },
-            {
-                name: "Accept Trigger",
-                action: {type: "sendCommand", command: "userapp_trigger accept"},
-            },
-            {
-                name: "Get Cached Data",
-                action: {type: "getData"},
-            },
-            {
-                name: "Sample Notification",
-                action: {type: "notification", text: "Hello, World!"},
-            },
-            {
-                name: "Sample Popup",
-                action: {type: "popup", title: "Title", text: "Hello, World!"},
-            },
-            {
-                name: "Sample Oneliner",
-                action: {type: "oneliner", text: "Hello, World!"},
-            },
-            {
-                name: "Sample Message",
-                action: {type: "message", text: "Hello, World!"},
-            },
-            {
-                name: "Sample Info",
-                action: {type: "info", text: "Hello, World!", time: 10},
-            }
-        ];
-        for (const action of actions) {
-            const button = document.createElement("button");
-            button.textContent = action.name;
-            button.onclick = () => {
-                window.parent.postMessage(action.action, "*");
-            };
-            document.querySelector("#buttons").appendChild(button);
-        }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Marketplace Notifier</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #eee; margin: 0; padding: 1rem; }
+    h2 { color: #4ade80; }
+    #log { max-height: 300px; overflow-y: auto; margin-top: 1rem; }
+    .item { padding: 6px; border-bottom: 1px solid #333; }
+    .price { color: #60a5fa; }
+  </style>
+</head>
+<body>
+  <h2>Marketplace Watcher</h2>
+  <div id="log"></div>
 
-        // It is recommended to have a button to close the window
-        // This is a simple example of how to do it
-        const escapeListener = (e) => {
-            if (e.key === "Escape") {
-                // Pin the window, meaning we give control back to the game
-                window.parent.postMessage({type: "pin"}, "*");
-            }
-        };
-        window.addEventListener('keydown', escapeListener);
+  <script>
+    let lastItems = {};
 
-        // Restrict length of data on screen, to avoid flooding the screen
-        const trunc = (str, len) => {
-            len = len || 50;
-            if (str.length > len) {
-                return str.substring(0, len) + "...";
-            }
-            return str;
-        };
+    // Listen for messages from game client
+    window.addEventListener("message", (event) => {
+      let data = event.data;
 
-        // The game client will send data that we can handle
-        // Data is sent as key/value pairs in event.data.data
-        // The client only sends data that has changed, unless getData is requested, in which case all cached data is sent
-        window.addEventListener("message", (event) => {
-            const evt = event.data;
-            // Display all data key/value pairs in a table
-            for (const key in evt.data)
-            {
-                let found = false;
-                // Update the existing entries so we don't have duplicates
-                for (const row of document.querySelector("#data").children)
-                {
-                    if (row.children[0].textContent === key)
-                    {
-                        row.children[1].textContent = trunc(evt.data[key]);
-                        found = true;
-                        break;
-                    }
-                }
-                if (found) continue;
-                const row = document.createElement("tr");
-                const c1 = document.createElement("td");
-                const c2 = document.createElement("td");
-                c1.textContent = key;
-                c2.textContent = trunc(evt.data[key]);
-                row.appendChild(c1);
-                row.appendChild(c2);
-                document.querySelector("#data").appendChild(row);
+      // Assume marketplace data comes in as JSON string under key 'marketplace'
+      if (data.marketplace) {
+        try {
+          let items = JSON.parse(data.marketplace);
+
+          for (let id in items) {
+            let item = items[id];
+            if (!lastItems[id]) {
+              // New item found
+              notifyNewItem(item);
             }
-            // Example handling for the default bindable keys
-            // The command userapp_trigger <key> can be bound manually
-            // trigger_ is prepended to the key name to avoid conflicts
-            for (const key in evt.data)
-            {
-                if (key == "trigger_square") {
-                    console.log("Square pressed!");
-                    window.parent.postMessage({type: "notification", text: "Square pressed!"}, "*");
-                } else if (key == "trigger_circle") {
-                    console.log("Circle pressed!");
-                    window.parent.postMessage({type: "notification", text: "Circle pressed!"}, "*");
-                } else if (key == "trigger_triangle") {
-                    console.log("Triangle pressed!");
-                    window.parent.postMessage({type: "notification", text: "Triangle pressed!"}, "*");
-                } else if (key == "trigger_cross") {
-                    console.log("Cross pressed!");
-                    window.parent.postMessage({type: "notification", text: "Cross pressed!"}, "*");
-                }
-            }
-        });
-    </script>
-    <style>
-        summary {
-            background-color: white;
+          }
+          lastItems = items;
+        } catch (e) {
+          console.error("Failed to parse marketplace JSON", e);
         }
-        table {
-            border: 1px solid black;
-            background-color: white;
-        }
-        th {
-            background-color: #f1f1f1;
-            border: 1px solid black;
-        }
-    </style>
+      }
+    });
+
+    function notifyNewItem(item) {
+      let log = document.getElementById("log");
+      let div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `<b>${item.name}</b> — <span class="price">$${item.price}</span>`;
+      log.prepend(div);
+
+      // Send notification to the game
+      window.parent.postMessage({
+        type: "notification",
+        text: `New Item: ${item.name} ($${item.price})`
+      }, "*");
+
+      // Play sound effect
+      window.parent.postMessage({
+        type: "sfx",
+        sfx: 6 // "CHALLENGE_UNLOCKED"
+      }, "*");
+    }
+
+    // Request initial marketplace data when app loads
+    window.parent.postMessage({ type: "getNamedData", keys: ["marketplace"] }, "*");
+  </script>
+</body>
 </html>
